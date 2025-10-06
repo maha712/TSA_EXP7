@@ -4,7 +4,7 @@ REG NO : 212222240057
 
 NAME: MAHALAKSHMI K
 
-### Date: 
+
 
 ### AIM:
 
@@ -28,62 +28,116 @@ To Implementat an Auto Regressive Model using Python
 
 ### PROGRAM
 ```
+# -------------------------------
+# 1. Import necessary libraries
+# -------------------------------
 import pandas as pd
-from statsmodels.tsa.ar_model import AutoReg
-from statsmodels.tsa.holtwinters import ExponentialSmoothing
 import matplotlib.pyplot as plt
+from statsmodels.tsa.stattools import adfuller
+from statsmodels.graphics.tsaplots import plot_acf, plot_pacf
+from statsmodels.tsa.ar_model import AutoReg
+from sklearn.metrics import mean_squared_error
 
-# Sample data creation for demonstration
-data = {
-    'Date': pd.date_range(start='2020-01-01', periods=100, freq='D'),
-    'Cases': [10, 15, 20, 30, 50, 70, 100, 150, 200, 250] * 10
-}
-df = pd.DataFrame(data)
-df.set_index('Date', inplace=True)
+# -------------------------------
+# 2. Load dataset
+# -------------------------------
+df = pd.read_csv("/content/Netflix Dataset.csv")
 
-# Fit the Auto-Regressive model
-ar_model = AutoReg(df['Cases'], lags=1)
+# Convert Release_Date to datetime
+df['Release_Date'] = pd.to_datetime(df['Release_Date'], errors='coerce')
+
+# Drop rows without valid dates
+df = df.dropna(subset=['Release_Date'])
+
+# Set index
+df.set_index('Release_Date', inplace=True)
+
+# Monthly count of releases
+monthly_releases = df.resample("MS").size()
+monthly_releases = monthly_releases.asfreq("MS")  # ensure continuous monthly index
+
+# -------------------------------
+# 3. Augmented Dickey-Fuller test
+# -------------------------------
+result = adfuller(monthly_releases.dropna())
+print("ADF Statistic:", result[0])
+print("p-value:", result[1])
+print("Critical Values:", result[4])
+
+if result[1] < 0.05:
+    print("✅ Series is stationary")
+else:
+    print("⚠️ Series is NOT stationary")
+
+# -------------------------------
+# 4. Train-test split
+# -------------------------------
+train_size = int(len(monthly_releases) * 0.8)
+train, test = monthly_releases.iloc[:train_size], monthly_releases.iloc[train_size:]
+
+# -------------------------------
+# 5. Fit AutoRegressive (AR) model
+# -------------------------------
+lag = 13
+ar_model = AutoReg(train, lags=lag, old_names=False)
 ar_fit = ar_model.fit()
-df['AR_Predictions'] = ar_fit.predict(start=len(df), end=len(df)+29, dynamic=False)
+print(ar_fit.summary())
 
-# Fit the Exponential Smoothing model
-es_model = ExponentialSmoothing(df['Cases'], trend='add', seasonal='add', seasonal_periods=7)
-es_fit = es_model.fit()
-df['ES_Predictions'] = es_fit.fittedvalues
+# -------------------------------
+# 6. Plot ACF and PACF
+# -------------------------------
+plt.figure(figsize=(12, 5))
+plt.subplot(1, 2, 1)
+plot_acf(monthly_releases.dropna(), lags=40, ax=plt.gca())
+plt.title("Autocorrelation Function (ACF)")
 
-# Forecasting
-ar_forecast = ar_fit.predict(start=len(df), end=len(df)+29, dynamic=False)
-es_forecast = es_fit.forecast(steps=30)
+plt.subplot(1, 2, 2)
+plot_pacf(monthly_releases.dropna(), lags=40, ax=plt.gca())
+plt.title("Partial Autocorrelation Function (PACF)")
+plt.tight_layout()
+plt.show()
 
-# Plotting the results
-plt.figure(figsize=(14, 7))
-plt.plot(df['Cases'], label='Actual Cases', color='blue')
-plt.plot(df['AR_Predictions'], label='AR Model Predictions', color='orange')
-plt.plot(df['ES_Predictions'], label='Exponential Smoothing Fit', color='green')
-plt.plot(pd.date_range(start=df.index[-1] + pd.Timedelta(days=1), periods=30), ar_forecast, label='AR Forecast', color='red', linestyle='--')
-plt.plot(pd.date_range(start=df.index[-1] + pd.Timedelta(days=1), periods=30), es_forecast, label='ES Forecast', color='purple', linestyle='--')
-plt.title('COVID-19 Cases Forecasting with AR Model and Exponential Smoothing')
-plt.xlabel('Date')
-plt.ylabel('Number of Cases')
+# -------------------------------
+# 7. Make predictions
+# -------------------------------
+start = len(train)
+end = len(train) + len(test) - 1
+predictions = ar_fit.predict(start=start, end=end, dynamic=False)
+
+# -------------------------------
+# 8. Evaluate with MSE
+# -------------------------------
+mse = mean_squared_error(test, predictions)
+print("Mean Squared Error (MSE):", mse)
+
+# -------------------------------
+# 9. Plot Test vs Predictions
+# -------------------------------
+plt.figure(figsize=(12, 6))
+plt.plot(test.index, test, label='Actual Test Data', color='blue')
+plt.plot(test.index, predictions, label='AR Model Predictions', color='red', linestyle='--')
+plt.title(f"AutoRegressive Model (lags={lag}) - Test vs Predictions")
+plt.xlabel("Date")
+plt.ylabel("Number of Netflix Releases")
 plt.legend()
 plt.grid()
 plt.show()
+
 ```
 
 ### OUTPUT:
 
-![376948964-1b25c294-a409-4ced-909d-fabb6352f96c](https://github.com/user-attachments/assets/15aa55db-6e67-4c50-8947-adae4434fcaa)
+<img width="1416" height="692" alt="Screenshot (12)" src="https://github.com/user-attachments/assets/8d900cb3-d94b-4818-acb4-e369c05103ad" />
 
 
-![376949072-469de4fa-15a9-4d62-b663-2c7afa827e56](https://github.com/user-attachments/assets/e95a7a49-eb6a-4ad9-bac7-9d6db37cda52)
+<img width="905" height="356" alt="Screenshot (13)" src="https://github.com/user-attachments/assets/e217afa4-121e-4637-9787-c4adff298528" />
 
-![376949139-caaec05a-7259-4eb0-bd23-123e5849bd04](https://github.com/user-attachments/assets/f99185fe-d620-4e1b-a5d6-a61bf7fee13c)
 
-![376949401-2ad6fa22-7ff0-45b0-a0e4-5b7dbb8ac8b8](https://github.com/user-attachments/assets/631377cb-ca9d-4c2b-8f78-db1e3a5c8408)
 
-![376949466-144c35de-abf8-4dd8-9af2-ad73e88c21db](https://github.com/user-attachments/assets/69f77208-cd11-4194-93e5-11991ac82e6e)
+<img width="1491" height="606" alt="Screenshot (14)" src="https://github.com/user-attachments/assets/94de53ce-ab91-405e-91cd-97d29371b925" />
 
-![376949640-d5adcb02-2712-4025-8312-1ff8b389b34e](https://github.com/user-attachments/assets/81a3ef1b-704c-4dfb-87c9-1226b4599153)
+
+<img width="1289" height="720" alt="Screenshot (15)" src="https://github.com/user-attachments/assets/179a6c5b-b727-46c7-a1ec-4b5f607907a9" />
 
 
 ### RESULT:
